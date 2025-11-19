@@ -1,0 +1,827 @@
+#!/usr/bin/env python3
+"""
+Complete ChIP-seq Analysis Pipeline
+FASTQ → BAM → Peaks → QC in one unified Python script
+
+Performs:
+1. BWA-MEM alignment
+2. BAM processing (sorting, deduplication, filtering)
+3. Quality control metrics (flagstat, complexity, insert size)
+4. BigWig generation
+5. MACS2 peak calling
+6. FRiP score calculation
+7. Fingerprint analysis
+
+Author: Grace's Lab
+Date: 2025
+"""
+
+import os
+import sys
+import argparse
+import subprocess
+import logging
+from pathlib import Path
+from datetime import datetime
+import re
+
+
+class ChIPseqPipeline:
+    """Complete ChIP-seq analysis pipeline"""
+    
+    def __init__(self, args):
+        self.args = args
+        # Create output directory first (needed for log file)
+        os.makedirs(self.args.output_dir, exist_ok=True)
+        self.setup_logging()
+        self.validate_inputs()
+        self.setup_output_structure()
+        
+    def setup_logging(self):
+        """Set up logging to file and console"""
+        log_file = os.path.join(
+            self.args.output_dir, 
+            f"{self.args.name}_pipeline_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+        )
+        
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler(log_file),
+                logging.StreamHandler(sys.stdout)
+            ]
+        )
+        self.logger = logging.getLogger(__name__)
+        
+    def validate_inputs(self):
+        """Validate all required inputs exist"""
+        # Check FASTQ files
+        if not os.path.exists(self.args.fastq_r1):
+            raise FileNotFoundError(f"R1 FASTQ not found: {self.args.fastq_r1}")
+        if not os.path.exists(self.args.fastq_r2):
+            raise FileNotFoundError(f"R2 FASTQ not found: {self.args.fastq_r2}")
+            
+        # Check reference genome
+        if not os.path.exists(self.args.reference):
+            raise FileNotFoundError(f"Reference genome not found: {self.args.reference}")
+            
+        # Check BWA index files
+        for ext in ['.amb', '.ann', '.bwt', '.pac', '.sa']:
+            index_file = f"{self.args.reference}{ext}"
+            if not os.path.exists(index_file):
+                raise FileNotFoundError(
+                    f"BWA index file not found: {index_file}\n"
+                    f"Please run: bwa index {self.args.reference}"
+                )
+        
+        # Check Picard JAR
+        if not os.path.exists(self.args.picard_jar):
+            raise FileNotFoundError(f"Picard JAR not found: {self.args.picard_jar}")
+            
+        # Validate genome size
+        if self.args.genome_size <= 0:
+            raise ValueError(f"Genome size must be positive: {self.args.genome_size}")
+            
+    def setup_output_structure(self):
+        """Create output directory structure"""
+        self.dirs = {
+            'base': self.args.output_dir,
+            'bam': os.path.join(self.args.output_dir, 'bam'),
+            'qc': os.path.join(self.args.output_dir, 'qc'),
+            'metrics': os.path.join(self.args.output_dir, 'metrics'),
+            'bigwig': os.path.join(self.args.output_dir, 'bigwig'),
+            'peaks': os.path.join(self.args.output_dir, 'peaks'),
+            'logs': os.path.join(self.args.output_dir, 'logs')
+        }
+        
+        for dir_path in self.dirs.values():
+            os.makedirs(dir_path, exist_ok=True)
+            
+        self.logger.info(f"Output directory structure created: {self.args.output_dir}")
+        
+    def run_command(self, cmd, step_name, shell=False):
+        """Run a command and handle errors"""
+        self.logger.info(f"Running: {step_name}")
+        if isinstance(cmd, list):
+            self.logger.debug(f"Command: {' '.join(cmd)}")
+        else:
+            self.logger.debug(f"Command: {cmd}")
+            
+        try:
+            if shell:
+                result = subprocess.run(
+                    cmd,
+                    shell=True,
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+            else:
+                result = subprocess.run(
+                    cmd,
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+            
+            if result.stdout:
+                self.logger.debug(f"STDOUT: {result.stdout}")
+            if result.stderr:
+                self.logger.debug(f"STDERR: {result.stderr}")
+                
+            return result
+            
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"ERROR in {step_name}")
+            self.logger.error(f"Return code: {e.returncode}")
+            self.logger.error(f"STDOUT: {e.stdout}")
+            self.logger.error(f"STDERR: {e.stderr}")
+            raise
+            
+    def step1_alignment(self):
+        """Step 1: BWA-MEM alignment"""
+        self.logger.info("="*60)
+        self.logger.info("STEP 1: BWA-MEM Alignment")
+        self.logger.info("="*60)
+        
+        sorted_bam = os.path.join(self.dirs['bam'], f"{self.args.name}_sorted.bam")
+        sam_file = os.path.join(self.dirs['bam'], f"{self.args.name}.sam")
+        bwa_log = os.path.join(self.dirs['logs'], f"{self.args.name}_bwa.log")
+        
+        # Construct read group string
+        rg_string = f"@RG\\tID:{self.args.name}\\tSM:{self.args.name}\\tLB:{self.args.name}_lib\\tPL:ILLUMINA\\tPU:{self.args.name}_unit"
+        
+        # Step 1a: Run BWA-MEM to SAM file
+        self.logger.info("Running BWA-MEM alignment...")
+        
+        bwa_cmd = [
+            'bwa', 'mem',
+            '-M',
+            '-t', str(self.args.threads),
+            '-R', rg_string,
+            self.args.reference,
+            self.args.fastq_r1,
+            self.args.fastq_r2
+        ]
+        
+        self.logger.info(f"Command: {' '.join(bwa_cmd)}")
+        
+        with open(sam_file, 'w') as sam_out, open(bwa_log, 'w') as log_out:
+            result = subprocess.run(
+                bwa_cmd,
+                stdout=sam_out,
+                stderr=log_out,
+                check=False
+            )
+        
+        if result.returncode != 0:
+            self.logger.error("BWA alignment failed!")
+            if os.path.exists(bwa_log):
+                self.logger.error("BWA log:")
+                with open(bwa_log, 'r') as f:
+                    self.logger.error(f.read())
+            raise RuntimeError("BWA alignment failed")
+        
+        # Check if SAM file was created
+        if not os.path.exists(sam_file) or os.path.getsize(sam_file) < 1000:
+            self.logger.error(f"BWA failed to produce valid SAM file")
+            raise RuntimeError("BWA alignment failed")
+        
+        self.logger.info(f"BWA alignment completed, SAM file size: {os.path.getsize(sam_file):,} bytes")
+        
+        # Step 1b: Convert SAM to sorted BAM
+        self.logger.info("Converting SAM to sorted BAM...")
+        
+        sort_cmd = [
+            'samtools', 'sort',
+            '-@', str(self.args.threads),
+            '-o', sorted_bam,
+            '-T', os.path.join(self.dirs['bam'], f"{self.args.name}.tmp"),
+            sam_file
+        ]
+        
+        self.run_command(sort_cmd, "SAM to BAM conversion and sorting")
+        
+        # Clean up SAM file
+        if os.path.exists(sam_file):
+            os.remove(sam_file)
+            self.logger.info("Cleaned up intermediate SAM file")
+        
+        self.logger.info(f"Sorted BAM created: {sorted_bam}")
+        
+        return sorted_bam
+        
+    def step2_mark_duplicates(self, input_bam):
+        """Step 2: Mark duplicates with Picard"""
+        self.logger.info("="*60)
+        self.logger.info("STEP 2: Mark Duplicates")
+        self.logger.info("="*60)
+        
+        marked_bam = os.path.join(self.dirs['bam'], f"{self.args.name}_marked_duplicates.bam")
+        metrics_file = os.path.join(self.dirs['metrics'], f"{self.args.name}_duplicate_metrics.txt")
+        
+        cmd = [
+            'java', f'-Xmx{self.args.memory}G', '-jar', self.args.picard_jar,
+            'MarkDuplicates',
+            f'INPUT={input_bam}',
+            f'OUTPUT={marked_bam}',
+            f'METRICS_FILE={metrics_file}',
+            'VALIDATION_STRINGENCY=LENIENT',
+            'REMOVE_DUPLICATES=false',
+            'ASSUME_SORTED=true'
+        ]
+        
+        self.run_command(cmd, "Picard MarkDuplicates")
+        self.logger.info(f"Duplicates marked: {marked_bam}")
+        
+        return marked_bam, metrics_file
+        
+    def step3_calculate_complexity(self, marked_bam):
+        """Step 3: Calculate library complexity metrics"""
+        self.logger.info("="*60)
+        self.logger.info("STEP 3: Library Complexity Analysis")
+        self.logger.info("="*60)
+        
+        complexity_file = os.path.join(self.dirs['qc'], f"{self.args.name}_complexity.txt")
+        
+        # Get read counts
+        total_cmd = f"samtools view -c -f 2 {marked_bam}"
+        distinct_cmd = f"samtools view -c -f 2 -F 1024 {marked_bam}"
+        unique_cmd = f"samtools view -c -f 2 -F 1024 -q 30 {marked_bam}"
+        
+        total_pairs = int(subprocess.check_output(total_cmd, shell=True).decode().strip())
+        distinct_pairs = int(subprocess.check_output(distinct_cmd, shell=True).decode().strip())
+        unique_pairs = int(subprocess.check_output(unique_cmd, shell=True).decode().strip())
+        
+        # Calculate complexity metrics
+        nrf = unique_pairs / total_pairs if total_pairs > 0 else 0
+        pbc1 = unique_pairs / distinct_pairs if distinct_pairs > 0 else 0
+        pbc2 = distinct_pairs / unique_pairs if unique_pairs > 0 else 0
+        
+        # Save metrics
+        with open(complexity_file, 'w') as f:
+            f.write(f"Sample: {self.args.name}\n")
+            f.write(f"Total_pairs: {total_pairs}\n")
+            f.write(f"Distinct_pairs: {distinct_pairs}\n")
+            f.write(f"Unique_pairs: {unique_pairs}\n")
+            f.write(f"NRF: {nrf:.3f}\n")
+            f.write(f"PBC1: {pbc1:.3f}\n")
+            f.write(f"PBC2: {pbc2:.1f}\n")
+        
+        self.logger.info(f"Complexity metrics: NRF={nrf:.3f}, PBC1={pbc1:.3f}, PBC2={pbc2:.1f}")
+        
+        # Interpret complexity
+        if nrf >= 0.7:
+            self.logger.info("✓ Excellent library complexity")
+        elif nrf >= 0.5:
+            self.logger.info("✓ Good library complexity")
+        else:
+            self.logger.warning(f"⚠ Low library complexity (NRF={nrf:.3f})")
+            
+        return {'nrf': nrf, 'pbc1': pbc1, 'pbc2': pbc2, 
+                'total': total_pairs, 'distinct': distinct_pairs, 'unique': unique_pairs}
+        
+    def step4_filter_bam(self, marked_bam):
+        """Step 4: Filter BAM file"""
+        self.logger.info("="*60)
+        self.logger.info("STEP 4: BAM Filtering")
+        self.logger.info("="*60)
+        
+        filtered_bam = os.path.join(self.dirs['bam'], f"{self.args.name}_filtered.bam")
+        final_bam = os.path.join(self.dirs['bam'], f"{self.args.name}_final.bam")
+        
+        # Filter: proper pairs, high quality, exclude unmapped/secondary/duplicates
+        # -f 2: proper pairs
+        # -F 1804: exclude unmapped (4) + mate unmapped (8) + secondary (256) + QC-fail (512) + duplicate (1024)
+        # -q 30: MAPQ >= 30
+        cmd = [
+            'samtools', 'view',
+            '-@', str(self.args.threads),
+            '-b', '-q', '30',
+            '-f', '2',
+            '-F', '1804',
+            '-o', filtered_bam,
+            marked_bam
+        ]
+        
+        self.run_command(cmd, "BAM filtering")
+        
+        # Copy to final
+        subprocess.run(['cp', filtered_bam, final_bam], check=True)
+        
+        # Index final BAM
+        self.run_command(['samtools', 'index', final_bam], "BAM indexing")
+        
+        self.logger.info(f"Filtered BAM created: {final_bam}")
+        
+        return final_bam
+        
+    def step5_insert_size_metrics(self, final_bam):
+        """Step 5: Collect insert size metrics"""
+        self.logger.info("="*60)
+        self.logger.info("STEP 5: Insert Size Analysis")
+        self.logger.info("="*60)
+        
+        insert_metrics = os.path.join(self.dirs['qc'], f"{self.args.name}_insert_metrics.txt")
+        insert_hist = os.path.join(self.dirs['qc'], f"{self.args.name}_insert_hist.pdf")
+        
+        cmd = [
+            'java', f'-Xmx{self.args.memory}G', '-jar', self.args.picard_jar,
+            'CollectInsertSizeMetrics',
+            f'INPUT={final_bam}',
+            f'OUTPUT={insert_metrics}',
+            f'HISTOGRAM_FILE={insert_hist}',
+            'METRIC_ACCUMULATION_LEVEL=ALL_READS',
+            'VALIDATION_STRINGENCY=LENIENT'
+        ]
+        
+        try:
+            self.run_command(cmd, "Insert size metrics collection")
+            
+            # Parse metrics
+            with open(insert_metrics, 'r') as f:
+                for line in f:
+                    if line.startswith('MEDIAN_INSERT_SIZE'):
+                        # Next line has the data
+                        data_line = next(f).strip().split('\t')
+                        median_insert = int(float(data_line[0]))
+                        mean_insert = float(data_line[1])
+                        mode_insert = int(float(data_line[2]) if data_line[2] != '?' else 0)
+                        mad_insert = float(data_line[3]) if len(data_line) > 3 else 0
+                        
+                        self.logger.info(f"Insert size: Mean={mean_insert:.1f}, Median={median_insert}, Mode={mode_insert}")
+                        
+                        # Validate for H3K4me2
+                        if self.args.mark_type == 'H3K4me2':
+                            if median_insert < 150 or median_insert > 300:
+                                self.logger.warning(f"⚠ Insert size ({median_insert}bp) outside typical H3K4me2 range (150-300bp)")
+                            else:
+                                self.logger.info(f"✓ Insert size within expected range for H3K4me2")
+                        
+                        return {
+                            'median': median_insert,
+                            'mean': mean_insert,
+                            'mode': mode_insert,
+                            'mad': mad_insert
+                        }
+        except:
+            self.logger.warning("⚠ Insert size metrics collection failed, using defaults")
+            return {'median': 0, 'mean': 0, 'mode': 0, 'mad': 0}
+            
+    def step6_generate_qc(self, sorted_bam, final_bam):
+        """Step 6: Generate QC metrics"""
+        self.logger.info("="*60)
+        self.logger.info("STEP 6: QC Metrics")
+        self.logger.info("="*60)
+        
+        flagstat_file = os.path.join(self.dirs['qc'], f"{self.args.name}_flagstat.txt")
+        
+        # Run flagstat
+        self.run_command(
+            ['samtools', 'flagstat', final_bam],
+            "Flagstat generation"
+        )
+        
+        with open(flagstat_file, 'w') as f:
+            result = subprocess.run(
+                ['samtools', 'flagstat', final_bam],
+                capture_output=True,
+                text=True
+            )
+            f.write(result.stdout)
+        
+        # Get read counts
+        total_reads = int(subprocess.check_output(f"samtools view -c {sorted_bam}", shell=True).decode().strip())
+        mapped_reads = int(subprocess.check_output(f"samtools view -c -F 4 {sorted_bam}", shell=True).decode().strip())
+        final_reads = int(subprocess.check_output(f"samtools view -c {final_bam}", shell=True).decode().strip())
+        
+        mapping_rate = (mapped_reads / total_reads * 100) if total_reads > 0 else 0
+        
+        self.logger.info(f"Total reads: {total_reads:,}")
+        self.logger.info(f"Mapped reads: {mapped_reads:,} ({mapping_rate:.2f}%)")
+        self.logger.info(f"Final reads: {final_reads:,}")
+        
+        return {
+            'total': total_reads,
+            'mapped': mapped_reads,
+            'final': final_reads,
+            'mapping_rate': mapping_rate
+        }
+        
+    def step7_generate_bigwig(self, final_bam, final_reads):
+        """Step 7: Generate normalized BigWig"""
+        self.logger.info("="*60)
+        self.logger.info("STEP 7: BigWig Generation")
+        self.logger.info("="*60)
+        
+        bigwig_file = os.path.join(self.dirs['bigwig'], f"{self.args.name}.bw")
+        
+        # Create genome sizes file if needed
+        genome_sizes = os.path.join(self.dirs['base'], 'genome.sizes')
+        if not os.path.exists(genome_sizes):
+            self.logger.info("Creating genome sizes file...")
+            fai_file = f"{self.args.reference}.fai"
+            
+            if not os.path.exists(fai_file):
+                self.run_command(['samtools', 'faidx', self.args.reference], "Index reference")
+            
+            with open(fai_file, 'r') as fin, open(genome_sizes, 'w') as fout:
+                for line in fin:
+                    parts = line.strip().split('\t')
+                    fout.write(f"{parts[0]}\t{parts[1]}\n")
+        
+        # Calculate CPM scaling factor
+        scale_factor = 1000000 / final_reads if final_reads > 0 else 1
+        
+        # Generate bedgraph
+        temp_bedgraph = os.path.join(self.dirs['bigwig'], f"{self.args.name}.bedgraph")
+        
+        bedgraph_cmd = f"bedtools genomecov -ibam {final_bam} -bg -scale {scale_factor} > {temp_bedgraph}"
+        self.run_command(bedgraph_cmd, "Generate bedGraph", shell=True)
+        
+        # Convert to bigWig
+        if os.path.exists(temp_bedgraph) and os.path.getsize(temp_bedgraph) > 0:
+            self.run_command(
+                ['bedGraphToBigWig', temp_bedgraph, genome_sizes, bigwig_file],
+                "Convert to bigWig"
+            )
+            os.remove(temp_bedgraph)
+            self.logger.info(f"✓ BigWig created: {bigwig_file}")
+        else:
+            self.logger.warning("⚠ bedGraph generation failed")
+            
+        return bigwig_file
+        
+    def step8_call_peaks(self, final_bam, control_bam=None):
+        """Step 8: MACS2/MACS3 peak calling"""
+        self.logger.info("="*60)
+        self.logger.info("STEP 8: Peak Calling")
+        self.logger.info("="*60)
+        
+        # Check if MACS3 is available, otherwise use MACS2
+        try:
+            subprocess.run(['macs3', '--version'], capture_output=True, check=True)
+            macs_cmd = 'macs3'
+            self.logger.info("Using MACS3 for peak calling")
+        except:
+            macs_cmd = 'macs2'
+            self.logger.info("Using MACS2 for peak calling (MACS3 not available)")
+        
+        # Build MACS command
+        peak_cmd = [
+            macs_cmd, 'callpeak',
+            '-t', final_bam,
+            '-f', 'BAMPE',
+            '-g', str(self.args.genome_size),
+            '-n', self.args.name,
+            '--outdir', self.dirs['peaks'],
+            '-q', str(self.args.qvalue),
+            '--keep-dup', 'all'
+        ]
+        
+        if control_bam:
+            peak_cmd.extend(['-c', control_bam])
+            self.logger.info(f"Using control: {control_bam}")
+        else:
+            self.logger.info("No control provided - calling peaks without INPUT")
+        
+        # Add model parameters
+        if self.args.nomodel:
+            peak_cmd.append('--nomodel')
+            if self.args.extsize:
+                peak_cmd.extend(['--extsize', str(self.args.extsize)])
+                self.logger.info(f"Using --nomodel with --extsize {self.args.extsize}")
+        
+        # Add broad peak parameters if specified
+        if self.args.broad:
+            peak_cmd.extend(['--broad', '--broad-cutoff', str(self.args.broad_cutoff)])
+            
+            # Add H3K9me2-specific parameters
+            if self.args.max_gap:
+                peak_cmd.extend(['--max-gap', str(self.args.max_gap)])
+            if self.args.min_length:
+                peak_cmd.extend(['--min-length', str(self.args.min_length)])
+            
+            self.logger.info(f"Calling broad peaks (cutoff={self.args.broad_cutoff}, max-gap={self.args.max_gap}, min-length={self.args.min_length})")
+        else:
+            peak_cmd.append('--call-summits')
+            self.logger.info("Calling narrow peaks")
+        
+        self.logger.info(f"Command: {' '.join(peak_cmd)}")
+        self.run_command(peak_cmd, "Peak calling")
+        
+        # Check output
+        peak_ext = 'broadPeak' if self.args.broad else 'narrowPeak'
+        peak_file = os.path.join(self.dirs['peaks'], f"{self.args.name}_peaks.{peak_ext}")
+        
+        if os.path.exists(peak_file):
+            peak_count = sum(1 for line in open(peak_file))
+            self.logger.info(f"✓ {peak_count:,} peaks called")
+        else:
+            self.logger.warning("⚠ Peak file not found")
+            
+        return peak_file if os.path.exists(peak_file) else None
+        
+    def step9_calculate_frip(self, final_bam, peak_file):
+        """Step 9: Calculate FRiP score"""
+        self.logger.info("="*60)
+        self.logger.info("STEP 9: FRiP Score Calculation")
+        self.logger.info("="*60)
+        
+        if not peak_file or not os.path.exists(peak_file):
+            self.logger.warning("⚠ No peaks found, skipping FRiP calculation")
+            return None
+        
+        frip_file = os.path.join(self.dirs['qc'], f"{self.args.name}_FRiP.txt")
+        
+        # Count total reads
+        total_cmd = f"samtools view -c -F 260 {final_bam}"
+        total_reads = int(subprocess.check_output(total_cmd, shell=True).decode().strip())
+        
+        # Count reads in peaks
+        reads_in_peaks_cmd = f"bedtools intersect -a {final_bam} -b {peak_file} -u -f 0.20 | samtools view -c"
+        reads_in_peaks = int(subprocess.check_output(reads_in_peaks_cmd, shell=True).decode().strip())
+        
+        frip = reads_in_peaks / total_reads if total_reads > 0 else 0
+        
+        self.logger.info(f"Total reads: {total_reads:,}")
+        self.logger.info(f"Reads in peaks: {reads_in_peaks:,}")
+        self.logger.info(f"FRiP score: {frip:.4f}")
+        
+        # Interpret FRiP
+        if frip >= 0.10:
+            self.logger.info("✓ Excellent ChIP enrichment (FRiP > 10%)")
+        elif frip >= 0.05:
+            self.logger.info("✓ Strong ChIP enrichment (FRiP > 5%)")
+        elif frip >= 0.01:
+            self.logger.info("○ Moderate ChIP enrichment (FRiP > 1%)")
+        else:
+            self.logger.warning(f"⚠ Weak ChIP enrichment (FRiP = {frip:.4f})")
+        
+        # Save FRiP
+        with open(frip_file, 'w') as f:
+            f.write(f"Sample\tTotal_Reads\tReads_in_Peaks\tFRiP\n")
+            f.write(f"{self.args.name}\t{total_reads}\t{reads_in_peaks}\t{frip:.4f}\n")
+        
+        return frip
+        
+    def step10_fingerprint(self, final_bam, control_bam=None):
+        """Step 10: Generate fingerprint plot"""
+        self.logger.info("="*60)
+        self.logger.info("STEP 10: Fingerprint Analysis")
+        self.logger.info("="*60)
+        
+        if not control_bam:
+            self.logger.info("No control provided, skipping fingerprint plot")
+            return
+        
+        fingerprint_plot = os.path.join(self.dirs['qc'], f"{self.args.name}_fingerprint.png")
+        fingerprint_metrics = os.path.join(self.dirs['qc'], f"{self.args.name}_fingerprint_metrics.txt")
+        
+        cmd = [
+            'plotFingerprint',
+            '-b', final_bam, control_bam,
+            '--labels', f'{self.args.name}_ChIP', f'{self.args.name}_INPUT',
+            '--plotFile', fingerprint_plot,
+            '--outQualityMetrics', fingerprint_metrics,
+            '--numberOfProcessors', str(self.args.threads)
+        ]
+        
+        try:
+            self.run_command(cmd, "Fingerprint plot generation")
+            self.logger.info(f"✓ Fingerprint plot: {fingerprint_plot}")
+        except:
+            self.logger.warning("⚠ Fingerprint plot generation failed")
+            
+    def generate_summary(self, metrics):
+        """Generate final summary report"""
+        self.logger.info("="*60)
+        self.logger.info("PIPELINE SUMMARY")
+        self.logger.info("="*60)
+        
+        summary_file = os.path.join(self.dirs['base'], f"{self.args.name}_summary.txt")
+        
+        with open(summary_file, 'w') as f:
+            f.write(f"ChIP-seq Analysis Summary\n")
+            f.write(f"Sample: {self.args.name}\n")
+            f.write(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"\n")
+            f.write(f"Input Files:\n")
+            f.write(f"  R1: {self.args.fastq_r1}\n")
+            f.write(f"  R2: {self.args.fastq_r2}\n")
+            f.write(f"  Reference: {self.args.reference}\n")
+            f.write(f"  Genome size: {self.args.genome_size:,} bp\n")
+            f.write(f"\n")
+            f.write(f"Alignment & Filtering:\n")
+            f.write(f"  Total reads: {metrics.get('total', 0):,}\n")
+            f.write(f"  Mapped reads: {metrics.get('mapped', 0):,} ({metrics.get('mapping_rate', 0):.2f}%)\n")
+            f.write(f"  Final reads: {metrics.get('final', 0):,}\n")
+            f.write(f"\n")
+            f.write(f"Library Complexity:\n")
+            f.write(f"  NRF: {metrics.get('nrf', 0):.3f}\n")
+            f.write(f"  PBC1: {metrics.get('pbc1', 0):.3f}\n")
+            f.write(f"  PBC2: {metrics.get('pbc2', 0):.1f}\n")
+            f.write(f"\n")
+            f.write(f"Insert Size:\n")
+            f.write(f"  Mean: {metrics.get('mean_insert', 0):.1f} bp\n")
+            f.write(f"  Median: {metrics.get('median_insert', 0)} bp\n")
+            f.write(f"  Mode: {metrics.get('mode_insert', 0)} bp\n")
+            f.write(f"\n")
+            
+            if metrics.get('frip') is not None:
+                f.write(f"Peak Calling:\n")
+                f.write(f"  Method: {'MACS3' if 'macs3' in str(self.args) else 'MACS2'}\n")
+                f.write(f"  Mode: {'Broad' if self.args.broad else 'Narrow'}\n")
+                f.write(f"  Q-value: {self.args.qvalue}\n")
+                if self.args.nomodel:
+                    f.write(f"  Model: --nomodel (extsize={self.args.extsize})\n")
+                if self.args.broad:
+                    f.write(f"  Broad cutoff: {self.args.broad_cutoff}\n")
+                    if self.args.max_gap:
+                        f.write(f"  Max gap: {self.args.max_gap}\n")
+                    if self.args.min_length:
+                        f.write(f"  Min length: {self.args.min_length}\n")
+                f.write(f"  FRiP score: {metrics.get('frip', 0):.4f}\n")
+                f.write(f"\n")
+            
+            f.write(f"Output Files:\n")
+            f.write(f"  Final BAM: {self.dirs['bam']}/{self.args.name}_final.bam\n")
+            f.write(f"  BigWig: {self.dirs['bigwig']}/{self.args.name}.bw\n")
+            if metrics.get('frip') is not None:
+                peak_ext = 'broadPeak' if self.args.broad else 'narrowPeak'
+                f.write(f"  Peaks: {self.dirs['peaks']}/{self.args.name}_peaks.{peak_ext}\n")
+        
+        self.logger.info(f"Summary report: {summary_file}")
+        
+    def run(self):
+        """Execute complete pipeline"""
+        self.logger.info("="*60)
+        self.logger.info(f"ChIP-seq Pipeline Started: {self.args.name}")
+        self.logger.info("="*60)
+        
+        metrics = {}
+        
+        try:
+            # Step 1: Alignment
+            sorted_bam = self.step1_alignment()
+            
+            # Step 2: Mark duplicates
+            marked_bam, dup_metrics = self.step2_mark_duplicates(sorted_bam)
+            
+            # Step 3: Calculate complexity
+            complexity = self.step3_calculate_complexity(marked_bam)
+            metrics.update(complexity)
+            
+            # Step 4: Filter BAM
+            final_bam = self.step4_filter_bam(marked_bam)
+            
+            # Step 5: Insert size metrics
+            insert_metrics = self.step5_insert_size_metrics(final_bam)
+            metrics['mean_insert'] = insert_metrics['mean']
+            metrics['median_insert'] = insert_metrics['median']
+            metrics['mode_insert'] = insert_metrics['mode']
+            
+            # Step 6: Generate QC
+            qc_metrics = self.step6_generate_qc(sorted_bam, final_bam)
+            metrics.update(qc_metrics)
+            
+            # Step 7: Generate BigWig
+            self.step7_generate_bigwig(final_bam, metrics['final'])
+            
+            # Step 8: Call peaks (if not INPUT and not skipped)
+            if not self.args.is_input and not self.args.skip_peak_calling:
+                peak_file = self.step8_call_peaks(final_bam, self.args.control_bam)
+                
+                # Step 9: Calculate FRiP
+                if peak_file:
+                    frip = self.step9_calculate_frip(final_bam, peak_file)
+                    metrics['frip'] = frip
+            elif self.args.skip_peak_calling:
+                self.logger.info("Peak calling skipped by user request")
+            else:
+                self.logger.info("Sample is INPUT - skipping peak calling")
+            
+            # Step 10: Fingerprint (if control provided)
+            if self.args.control_bam:
+                self.step10_fingerprint(final_bam, self.args.control_bam)
+            
+            # Generate summary
+            self.generate_summary(metrics)
+            
+            # Clean up intermediate files
+            if not self.args.keep_intermediate:
+                self.logger.info("Cleaning up intermediate files...")
+                os.remove(sorted_bam)
+                os.remove(marked_bam)
+            
+            self.logger.info("="*60)
+            self.logger.info("PIPELINE COMPLETED SUCCESSFULLY")
+            self.logger.info("="*60)
+            
+        except Exception as e:
+            self.logger.error(f"Pipeline failed: {str(e)}")
+            raise
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Complete ChIP-seq pipeline from FASTQ to peaks',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Example usage:
+
+1. Process ChIP sample with matched INPUT:
+   python chipseq_complete_pipeline.py \\
+       --fastq-r1 H3K4me2_R1.fastq.gz \\
+       --fastq-r2 H3K4me2_R2.fastq.gz \\
+       --reference Cneoformans_H99.fa \\
+       --genome-size 18874889 \\
+       --picard-jar /path/to/picard.jar \\
+       --output-dir ./H3K4me2_output \\
+       --name H3K4me2_WT \\
+       --control-bam INPUT_final.bam \\
+       --mark-type H3K4me2
+
+2. Process INPUT sample:
+   python chipseq_complete_pipeline.py \\
+       --fastq-r1 INPUT_R1.fastq.gz \\
+       --fastq-r2 INPUT_R2.fastq.gz \\
+       --reference Cneoformans_H99.fa \\
+       --genome-size 18874889 \\
+       --picard-jar /path/to/picard.jar \\
+       --output-dir ./INPUT_output \\
+       --name INPUT_WT \\
+       --is-input
+
+3. Broad peak calling (H3K9me2) with custom parameters:
+   python chipseq_complete_pipeline.py \\
+       --fastq-r1 H3K9me2_R1.fastq.gz \\
+       --fastq-r2 H3K9me2_R2.fastq.gz \\
+       --reference Cneoformans_H99.fa \\
+       --genome-size 18874889 \\
+       --picard-jar /path/to/picard.jar \\
+       --output-dir ./H3K9me2_output \\
+       --name H3K9me2_WT \\
+       --control-bam INPUT_final.bam \\
+       --mark-type H3K9me2 \\
+       --broad \\
+       --broad-cutoff 0.1 \\
+       --nomodel \\
+       --extsize 217 \\
+       --max-gap 1000 \\
+       --min-length 500
+
+4. H3K4me2 with custom extension size:
+   python chipseq_complete_pipeline.py \\
+       --fastq-r1 H3K4me2_R1.fastq.gz \\
+       --fastq-r2 H3K4me2_R2.fastq.gz \\
+       --reference Cneoformans_H99.fa \\
+       --genome-size 18874889 \\
+       --picard-jar /path/to/picard.jar \\
+       --output-dir ./H3K4me2_output \\
+       --name H3K4me2_WT \\
+       --control-bam INPUT_final.bam \\
+       --mark-type H3K4me2 \\
+       --nomodel \\
+       --extsize 150
+"""
+    )
+    
+    # Required arguments
+    required = parser.add_argument_group('required arguments')
+    required.add_argument('--fastq-r1', required=True, help='Path to R1 FASTQ file')
+    required.add_argument('--fastq-r2', required=True, help='Path to R2 FASTQ file')
+    required.add_argument('--reference', required=True, help='Path to reference genome FASTA (must be BWA indexed)')
+    required.add_argument('--genome-size', type=int, required=True, help='Effective genome size in bp')
+    required.add_argument('--picard-jar', required=True, help='Path to Picard JAR file')
+    required.add_argument('--output-dir', required=True, help='Output directory')
+    required.add_argument('--name', required=True, help='Sample name')
+    
+    # Optional arguments
+    parser.add_argument('--control-bam', help='Path to control/INPUT BAM for peak calling and fingerprint')
+    parser.add_argument('--is-input', action='store_true', help='This sample is an INPUT control (skip peak calling)')
+    parser.add_argument('--skip-peak-calling', action='store_true', help='Skip peak calling (only process to BAM)')
+    parser.add_argument('--mark-type', default='H3K4me2', 
+                       choices=['H3K4me2', 'H3K9me2', 'H3K27me3', 'H3K36me3', 'other'],
+                       help='Histone mark type (for QC thresholds)')
+    parser.add_argument('--broad', action='store_true', help='Call broad peaks instead of narrow peaks')
+    parser.add_argument('--broad-cutoff', type=float, default=0.1, help='Broad peak cutoff (default: 0.1)')
+    parser.add_argument('--qvalue', type=float, default=0.05, help='MACS2 q-value cutoff (default: 0.05)')
+    parser.add_argument('--nomodel', action='store_true', default=False, help='Use MACS --nomodel option')
+    parser.add_argument('--extsize', type=int, default=None, help='Extension size for MACS (use with --nomodel, e.g., 150 for H3K4me2, 217 for H3K9me2)')
+    parser.add_argument('--max-gap', type=int, default=None, help='Maximum gap between significant sites for broad peaks (default: auto)')
+    parser.add_argument('--min-length', type=int, default=None, help='Minimum length of broad peak (default: auto)')
+    parser.add_argument('--threads', type=int, default=8, help='Number of threads (default: 8)')
+    parser.add_argument('--memory', type=int, default=8, help='Memory in GB for Java tools (default: 8)')
+    parser.add_argument('--keep-intermediate', action='store_true', help='Keep intermediate BAM files')
+    
+    args = parser.parse_args()
+    
+    # Run pipeline
+    pipeline = ChIPseqPipeline(args)
+    pipeline.run()
+
+
+if __name__ == "__main__":
+    main()
