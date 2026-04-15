@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<Session genome="/Users/gracepaul/desktop/data/1.reference_genomes/Cryptococcus_neoformans_H99_CNA2/Cryptococcus_neoformans_H99_CNA2.genome.fa" locus="Chr14:0-926562" nextAutoscaleGroup="171" version="8">
+    <Resources>
+        <Resource path="/Users/gracepaul/desktop/2.normalized_h3k9me2/2.h3k4_minus_Input/knockout_K4_IP_1_FE.bw" type="bw"/>
+        <Resource path="/Users/gracepaul/desktop/data/1.reference_genomes/Cryptococcus_neoformans_H99_CNA2/Cryptococcus_neoformans_H99_CNA2.annotation.rna.gff3" type="gff3"/>
+        <Resource path="/Users/gracepaul/desktop/2.normalized_h3k9me2/2.h3k4_minus_Input/11692_1_S99_K4_FE.bw" type="bw"/>
+        <Resource path="/Users/gracepaul/desktop/data/2.isolates/Project_1_Chip_seq_KN99_vs_H1KN/2.Final_chip_seq/00.Chip_seq_manuscript_final_peaks/1.K9_peak_files/complement_h3k9me2_11429_K9_S1489_peaks.broadPeak" type="broadpeak"/>
+        <Resource path="/Users/gracepaul/desktop/2.normalized_h3k9me2/lo2_not/11692_4_S99_K9_permissive_log2ratio.bw" type="bw"/>
+        <Resource path="/Users/gracepaul/desktop/data/2.isolates/Project_1_Chip_seq_KN99_vs_H1KN/2.Final_chip_seq/00.Chip_seq_manuscript_final_peaks/2.K4_peak_files/complement_h3k4me2_11429_K4_S1488_peaks.narrowPeak" type="narrowpeak"/>
+        <Resource path="/Users/gracepaul/desktop/2.normalized_h3k9me2/lo2_not/complement_h3k9me2_11429_K9_S1489_permissive_log2ratio.bw" type="bw"/>
+        <Resource path="/Users/gracepaul/desktop/2.normalized_h3k9me2/lo2_not/knockout_K9_1_IP_permissive_log2ratio.bw" type="bw"/>
+        <Resource path="/Users/gracepaul/desktop/2.normalized_h3k9me2/2.h3k4_minus_Input/11692_3_S99_K4_FE.bw" type="bw"/>
+        <Resource path="/Users/gracepaul/desktop/2.normalized_h3k9me2/0.rna/complement_vs_KO_log2FC.bw" type="bw"/>
+        <Resource path="/Users/gracepaul/desktop/data/2.isolates/Project_1_Chip_seq_KN99_vs_H1KN/2.Final_chip_seq/00.Chip_seq_manuscript_final_peaks/1.K9_peak_files/11692_4_S99_K9_peaks.broadPeak" type="broadpeak"/>
+        <Resource path="/Users/gracepaul/desktop/2.normalized_h3k9me2/2.h3k4_minus_Input/knockout_K4_IP_3_FE.bw" type="bw"/>
+        <Resource path="/Users/gracepaul/desktop/data/2.isolates/Project_1_Chip_seq_KN99_vs_H1KN/2.Final_chip_seq/00.Chip_seq_manuscript_final_peaks/2.K4_peak_files/H1.52KO_merged_H3K4me2_peaks.narrowPeak" type="narrowpeak"/>
+        <Resource path="/Users/gracepaul/desktop/2.normalized_h3k9me2/0.rna/KN99a_vs_Complement_log2FC.bw" type="bw"/>
+        <Resource path="/Users/gracepaul/desktop/2.normalized_h3k9me2/0.rna/KN99a_vs_KO_log2FC.bw" type="bw"/>
+        <Resource path="/Users/gracepaul/desktop/data/2.isolates/Project_1_Chip_seq_KN99_vs_H1KN/2.Final_chip_seq/00.Chip_seq_manuscript_final_peaks/1.K9_peak_files/knockout_K9_2_IP_peaks.broadPeak" type="broadpeak"/>
+        <Resource path="/Users/gracepaul/desktop/data/2.isolates/Project_1_Chip_seq_KN99_vs_H1KN/2.Final_chip_seq/00.Chip_seq_manuscript_final_peaks/2.K4_peak_files/1.merged_k4_peaks/peaks_in_both_control_replicates.narrowPeak" type="narrowpeak"/>
+        <Resource path="/Users/gracepaul/desktop/2.normalized_h3k9me2/2.h3k4_minus_Input/complement_h3k4me2_11429_K4_S1488_FE.bw" type="bw"/>
+    </Resources>
+    <Panel height="834" name="DataPanel" width="1567">
+        <Track attributeKey="11692_4_S99_K9_permissive_log2ratio.bw" autoScale="false" clazz="org.broad.igv.track.DataSourceTrack" color="0,0,102" colorScale="ContinuousColorScale;0.0;26.590246200561523;255,255,255;0,0,102" fontSize="10" height="100" id="/Users/gracepaul/desktop/2.normalized_h3k9me2/lo2_not/11692_4_S99_K9_permissive_log2ratio.bw" name="KN99a H3K9me2 " renderer="BAR_CHART" visible="true" windowFunction="mean">
+            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="22.484426" minimum="0.0" type="LINEAR"/>
+        </Track>
+        <Track attributeKey="11692_4_S99_K9_peaks.broadPeak" clazz="org.broad.igv.track.FeatureTrack" color="0,0,102" displayMode="SQUISHED" fontSize="10" groupByStrand="false" height="10" id="/Users/gracepaul/desktop/data/2.isolates/Project_1_Chip_seq_KN99_vs_H1KN/2.Final_chip_seq/00.Chip_seq_manuscript_final_peaks/1.K9_peak_files/11692_4_S99_K9_peaks.broadPeak" name="" visible="true"/>
+        <Track attributeKey="complement_h3k9me2_11429_K9_S1489_permissive_log2ratio.bw" autoScale="false" clazz="org.broad.igv.track.DataSourceTrack" color="0,102,0" fontSize="10" height="100" id="/Users/gracepaul/desktop/2.normalized_h3k9me2/lo2_not/complement_h3k9me2_11429_K9_S1489_permissive_log2ratio.bw" name="KN99a::H1.52 H3K9me2 " renderer="BAR_CHART" showDataRange="false" visible="true" windowFunction="mean">
+            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="63.3405" minimum="0.0" type="LINEAR"/>
+        </Track>
+        <Track attributeKey="complement_h3k9me2_11429_K9_S1489_peaks.broadPeak" clazz="org.broad.igv.track.FeatureTrack" color="0,102,0" colorScale="ContinuousColorScale;0.0;6.0;255,255,255;0,0,178" displayMode="SQUISHED" fontSize="10" groupByStrand="false" height="10" id="/Users/gracepaul/desktop/data/2.isolates/Project_1_Chip_seq_KN99_vs_H1KN/2.Final_chip_seq/00.Chip_seq_manuscript_final_peaks/1.K9_peak_files/complement_h3k9me2_11429_K9_S1489_peaks.broadPeak" name="" visible="true"/>
+        <Track attributeKey="knockout_K9_1_IP_permissive_log2ratio.bw" autoScale="false" clazz="org.broad.igv.track.DataSourceTrack" color="153,0,0" fontSize="10" height="100" id="/Users/gracepaul/desktop/2.normalized_h3k9me2/lo2_not/knockout_K9_1_IP_permissive_log2ratio.bw" name="KN99aH1.52KN H3K9me2 " renderer="BAR_CHART" showDataRange="false" visible="true" windowFunction="mean">
+            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="223.07407" minimum="0.0" type="LINEAR"/>
+        </Track>
+        <Track attributeKey="knockout_K9_2_IP_peaks.broadPeak" clazz="org.broad.igv.track.FeatureTrack" color="153,0,0" displayMode="SQUISHED" fontSize="10" groupByStrand="false" height="10" id="/Users/gracepaul/desktop/data/2.isolates/Project_1_Chip_seq_KN99_vs_H1KN/2.Final_chip_seq/00.Chip_seq_manuscript_final_peaks/1.K9_peak_files/knockout_K9_2_IP_peaks.broadPeak" name="" visible="true"/>
+        <Track alpha="1.0" attributeKey="Overlay" autoScale="false" autoscaleGroup="164" clazz="org.broad.igv.track.MergedTracks" color="0,0,102" fontSize="10" height="100" id="d0ebc3ad-93a6-403b-aab3-cd3db5805080" name="KN99a H3K4me2 " renderer="BAR_CHART" visible="true">
+            <Track altColor="0,0,178" attributeKey="11692_1_S99_K4_FE.bw" autoScale="false" autoscaleGroup="164" color="0,0,102" fontSize="10" height="70" id="/Users/gracepaul/desktop/2.normalized_h3k9me2/2.h3k4_minus_Input/11692_1_S99_K4_FE.bw" name="11692_1_S99_K4_FE.bw" renderer="BAR_CHART" visible="true" windowFunction="mean"/>
+            <Track altColor="0,0,178" attributeKey="11692_3_S99_K4_FE.bw" autoScale="false" autoscaleGroup="164" color="0,0,102" fontSize="10" height="70" id="/Users/gracepaul/desktop/2.normalized_h3k9me2/2.h3k4_minus_Input/11692_3_S99_K4_FE.bw" name="11692_3_S99_K4_FE.bw" renderer="BAR_CHART" visible="true" windowFunction="mean"/>
+            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="5.9377184" minimum="0.0" type="LOG"/>
+        </Track>
+        <Track attributeKey="peaks_in_both_control_replicates.narrowPeak" clazz="org.broad.igv.track.FeatureTrack" color="0,0,102" colorScale="ContinuousColorScale;0.0;10.0;255,255,255;0,0,178" displayMode="SQUISHED" fontSize="10" groupByStrand="false" height="10" id="/Users/gracepaul/desktop/data/2.isolates/Project_1_Chip_seq_KN99_vs_H1KN/2.Final_chip_seq/00.Chip_seq_manuscript_final_peaks/2.K4_peak_files/1.merged_k4_peaks/peaks_in_both_control_replicates.narrowPeak" name="" visible="true"/>
+        <Track attributeKey="complement_h3k4me2_11429_K4_S1488_FE.bw" autoScale="false" autoscaleGroup="164" clazz="org.broad.igv.track.DataSourceTrack" color="0,102,0" fontSize="10" height="100" id="/Users/gracepaul/desktop/2.normalized_h3k9me2/2.h3k4_minus_Input/complement_h3k4me2_11429_K4_S1488_FE.bw" name="KN99a::H1.52 H3K4me2 " renderer="BAR_CHART" showDataRange="false" visible="true" windowFunction="mean">
+            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="6.592158" minimum="0.0" type="LOG"/>
+        </Track>
+        <Track attributeKey="complement_h3k4me2_11429_K4_S1488_peaks.narrowPeak" clazz="org.broad.igv.track.FeatureTrack" color="0,102,0" colorScale="ContinuousColorScale;0.0;14.0;255,255,255;0,0,178" displayMode="SQUISHED" fontSize="10" groupByStrand="false" height="10" id="/Users/gracepaul/desktop/data/2.isolates/Project_1_Chip_seq_KN99_vs_H1KN/2.Final_chip_seq/00.Chip_seq_manuscript_final_peaks/2.K4_peak_files/complement_h3k4me2_11429_K4_S1488_peaks.narrowPeak" name="" visible="true"/>
+        <Track alpha="1.0" attributeKey="Overlay" autoScale="false" autoscaleGroup="164" clazz="org.broad.igv.track.MergedTracks" color="153,0,0" fontSize="10" height="100" id="ef8310e9-83b9-40ae-b1c6-f2af965b97ab" name="H1.52KN H3K4me2 " renderer="BAR_CHART" showDataRange="false" visible="true">
+            <Track altColor="0,0,178" attributeKey="knockout_K4_IP_1_FE.bw" autoScale="false" autoscaleGroup="164" color="153,0,0" fontSize="10" id="/Users/gracepaul/desktop/2.normalized_h3k9me2/2.h3k4_minus_Input/knockout_K4_IP_1_FE.bw" name="knockout_K4_IP_1_FE.bw" renderer="BAR_CHART" showDataRange="false" visible="true" windowFunction="mean"/>
+            <Track altColor="0,0,178" attributeKey="knockout_K4_IP_3_FE.bw" autoScale="false" autoscaleGroup="164" color="153,0,0" fontSize="10" id="/Users/gracepaul/desktop/2.normalized_h3k9me2/2.h3k4_minus_Input/knockout_K4_IP_3_FE.bw" name="knockout_K4_IP_3_FE.bw" renderer="BAR_CHART" showDataRange="false" visible="true" windowFunction="mean"/>
+            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="5.9377184" minimum="0.0" type="LOG"/>
+        </Track>
+        <Track attributeKey="H1.52KO_merged_H3K4me2_peaks.narrowPeak" clazz="org.broad.igv.track.FeatureTrack" color="153,0,0" displayMode="SQUISHED" fontSize="10" groupByStrand="false" height="10" id="/Users/gracepaul/desktop/data/2.isolates/Project_1_Chip_seq_KN99_vs_H1KN/2.Final_chip_seq/00.Chip_seq_manuscript_final_peaks/2.K4_peak_files/H1.52KO_merged_H3K4me2_peaks.narrowPeak" name="" visible="true"/>
+        <Track attributeKey="KN99a_vs_Complement_log2FC.bw" autoScale="false" autoscaleGroup="170" clazz="org.broad.igv.track.DataSourceTrack" color="102,0,102" fontSize="10" id="/Users/gracepaul/desktop/2.normalized_h3k9me2/0.rna/KN99a_vs_Complement_log2FC.bw" name="RNA log2(KN99α/KN99α:H1.52)" renderer="BAR_CHART" visible="true" windowFunction="mean">
+            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="3.284842" minimum="-2.623159" type="LINEAR"/>
+        </Track>
+        <Track attributeKey="KN99a_vs_KO_log2FC.bw" autoScale="false" autoscaleGroup="170" clazz="org.broad.igv.track.DataSourceTrack" color="102,0,102" fontSize="10" id="/Users/gracepaul/desktop/2.normalized_h3k9me2/0.rna/KN99a_vs_KO_log2FC.bw" name="RNA log2(KN99α/H1.52Δ)" renderer="BAR_CHART" showDataRange="false" visible="true" windowFunction="mean">
+            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="3.284842" minimum="-2.623159" type="LINEAR"/>
+        </Track>
+        <Track attributeKey="complement_vs_KO_log2FC.bw" autoScale="false" autoscaleGroup="170" clazz="org.broad.igv.track.DataSourceTrack" color="102,0,102" colorScale="ContinuousColorScale;0.0;-7.338319778442383;0.0;8.1564302444458;247,247,6;255,255,255;0,0,178" fontSize="10" id="/Users/gracepaul/desktop/2.normalized_h3k9me2/0.rna/complement_vs_KO_log2FC.bw" name="RNA log2(H1.52Δ/KN99α:H1.52)" renderer="BAR_CHART" showDataRange="false" visible="true" windowFunction="mean">
+            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="3.284842" minimum="-2.623159" type="LINEAR"/>
+        </Track>
+    </Panel>
+    <Panel height="40" name="FeaturePanel" width="1567">
+        <Track attributeKey="Reference sequence" clazz="org.broad.igv.track.SequenceTrack" fontSize="10" id="Reference sequence" name="Reference sequence" sequenceTranslationStrandValue="+" shouldShowTranslation="false" visible="true"/>
+        <Track attributeKey="Cryptococcus_neoformans_H99_CNA2.annotation.rna.gff3" clazz="org.broad.igv.track.FeatureTrack" colorScale="ContinuousColorScale;0.0;292.0;255,255,255;0,0,178" fontSize="10" groupByStrand="false" id="/Users/gracepaul/desktop/data/1.reference_genomes/Cryptococcus_neoformans_H99_CNA2/Cryptococcus_neoformans_H99_CNA2.annotation.rna.gff3" name="H99 Annotation" visible="true"/>
+    </Panel>
+    <PanelLayout dividerFractions="0.9519595448798989"/>
+    <HiddenAttributes>
+        <Attribute name="DATA FILE"/>
+        <Attribute name="DATA TYPE"/>
+        <Attribute name="NAME"/>
+    </HiddenAttributes>
+</Session>
